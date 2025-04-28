@@ -18,7 +18,7 @@ folderList = folderList([folderList.isdir] & ~ismember({folderList.name}, {'.', 
 
 for i = 1:length(folderList)
     folderName = folderList(i).name;
-    patientID = matlab.lang.makeValidName(['P_' folderName]);
+    patientID = matlab.lang.makeValidName(['P' folderName]);
     % Creating a path to the folder
     fullFolderPath = fullfile(parentDir, folderName);
 
@@ -95,12 +95,6 @@ for i = 1:length(folderList)
         end
     end
 end
-
-% Encode and save
-jsonStr = jsonencode(output_struct, 'PrettyPrint', true);  % Nice formatting
-fid = fopen('IMU_Raw.json', 'w');
-if fid == -1
-    error('Cannot create JSON file');
-end
-fwrite(fid, jsonStr, 'char');
-fclose(fid);
+%% Saving to .mat file
+save("C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\MatLabCombined\IMU_Rotated.mat", ...
+    'output_struct')

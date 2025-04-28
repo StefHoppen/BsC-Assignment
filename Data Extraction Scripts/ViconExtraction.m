@@ -12,7 +12,7 @@ folderList = folderList([folderList.isdir] & ~ismember({folderList.name}, {'.', 
 
 for i = 1:length(folderList)
     folderName = folderList(i).name;
-    patientID = matlab.lang.makeValidName(['P_' folderName]);
+    patientID = matlab.lang.makeValidName(['P' folderName]);
     % Creating a path to the folder
     fullFolderPath = fullfile(parentDir, folderName);
 
@@ -49,12 +49,5 @@ for i = 1:length(folderList)
         CoM_struct.(patientID).(trialID) = trialData;
     end
 end
-
-% Encode and save
-jsonStr = jsonencode(CoM_struct, 'PrettyPrint', true);  % Nice formatting
-fid = fopen('VICON_COM.json', 'w');
-if fid == -1
-    error('Cannot create JSON file');
-end
-fwrite(fid, jsonStr, 'char');
-fclose(fid);
+save("C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\MatLabCombined\Vicon_CoM.mat", ...
+    'CoM_struct')

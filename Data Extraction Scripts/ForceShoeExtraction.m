@@ -101,12 +101,6 @@ for i = 1:length(folderList)
         GRF_struct.(patientID).(trialID) = trialData;
     end
 end
-
-%% Encode and save
-jsonStr = jsonencode(GRF_struct, 'PrettyPrint', true);  % Nice formatting
-fid = fopen('GRF_Total.json', 'w');
-if fid == -1
-    error('Cannot create JSON file');
-end
-fwrite(fid, jsonStr, 'char');
-fclose(fid);
+%% Save to .mat files
+save("C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\MatLabCombined\GRF_Total.mat", ...
+    'GRF_struct')
