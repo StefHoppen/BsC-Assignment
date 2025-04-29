@@ -62,4 +62,3 @@ Frf = butterfilterlpf(Frf',10,samplingFs,2);
 rightFoot = Frh + Frf;
 leftFoot = Flf + Flh;
 totalGRF = rightFoot + leftFoot;
-hoi = 'Hoi'

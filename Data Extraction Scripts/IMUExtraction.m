@@ -2,11 +2,12 @@ clc
 close all 
 clear
 %% Settings
-ROTATE = false;  % If accelerations and gyroscope measurements should be rotated to the global coordinate frame
+ROTATE = true;  % If accelerations and gyroscope measurements should be rotated to the global coordinate frame
 MAGNETOMETER = false;  % If magnetometer measurments should be included in the json file
 
 %% CODE
-output_struct = struct();
+IMUData = struct();
+RightFootData = struct();
 
 parentDir = 'C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\MatLab\IMU';
 SensorIDs = ["LeftFoot", "RightFoot", "Sternum", "Pelvis"];
@@ -87,14 +88,25 @@ for i = 1:length(folderList)
                 sensorData = struct( ...
                     'Accelerometer', accData, ...
                     'Gyroscope', gyrData);
+            
+            % If sensorID is right foot, also save it to a different
+            % struct (needed for syncing)
+            if strcmp(sensorID, 'RightFoot')
+                RightFootData.(patientID).(trialID) = accData;
+            
+            end
+
             end
 
 
 
-            output_struct.(patientID).(trialID).(sensorID) = sensorData;
+            IMUData.(patientID).(trialID).(sensorID) = sensorData;
         end
     end
 end
 %% Saving to .mat file
 save("C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\MatLabCombined\IMU_Rotated.mat", ...
-    'output_struct')
+    'IMUData')
+save("C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\MatLabCombined\IMU_RF.mat", ...
+    'RightFootData')
+

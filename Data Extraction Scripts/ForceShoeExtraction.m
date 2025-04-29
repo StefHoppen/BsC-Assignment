@@ -8,7 +8,8 @@ parentDir = 'C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository
 folderList = dir(parentDir);
 folderList = folderList([folderList.isdir] & ~ismember({folderList.name}, {'.', '..'}));
 
-GRF_struct = struct();
+GRFData = struct();
+RightFootData = struct();
 
 %% Looping over patients
 for i = 1:length(folderList)
@@ -64,14 +65,20 @@ for i = 1:length(folderList)
         Flh = zeros(3, N);  % Force left heel
         Frf = zeros(3, N);  % Force right foot
         Frh = zeros(3, N);  % Force right heel
-        
 
+        arf = zeros(3, N);  % Acceleration right foot, needed for syncing
+        
         %% Rotate forces and torques
         for sample = 1:N
             Flf(:,sample) = Rfs*ForceShoeData{1}.F(:,sample);
             Flh(:,sample) = Rfs*ForceShoeData{2}.F(:,sample);
             Frh(:,sample) = Rfs*ForceShoeData{3}.F(:,sample);
             Frf(:,sample) = Rfs*ForceShoeData{4}.F(:,sample);
+            
+            % Right Foot Accelerations
+
+            arf(:, sample) = 0.5 * (ForceShoeData{3}.acc(:, sample) + ForceShoeData{4}.acc(:, sample));
+
         end
 
 
@@ -98,9 +105,22 @@ for i = 1:length(folderList)
             'y', y, ...
             'z', z);
 
-        GRF_struct.(patientID).(trialID) = trialData;
+        GRFData.(patientID).(trialID) = trialData;
+
+        %% Storing right ankle accelerations (Needed for Syncing)
+        trialAcc = struct( ...
+            'x', arf(1, :)', ...
+            'y', arf(2, :)', ...
+            'z', arf(3, :)');
+
+        RightFootData.(patientID).(trialID) = trialAcc;
+
+
     end
 end
 %% Save to .mat files
 save("C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\MatLabCombined\GRF_Total.mat", ...
-    'GRF_struct')
+    'GRFData')
+
+save("C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\MatLabCombined\IFS_Acc_RF.mat", ...
+    'RightFootData')

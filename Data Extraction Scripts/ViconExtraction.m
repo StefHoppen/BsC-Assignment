@@ -2,7 +2,9 @@ clc
 close all 
 clear
 
-CoM_struct = struct();
+CoMData = struct();
+
+RightFootData = struct();
 
 parentDir = 'C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\MatLab\VICON';
 
@@ -39,15 +41,24 @@ for i = 1:length(folderList)
         comX = comPos(:, 1);
         comY = comPos(:, 2);
         comZ = comPos(:, 3);
+
+        rfPos = rawdata.MarkerPos.RHEE;
         
         trialData = struct( ...
             'x', comX', ...
             'y', comY', ...
             'z', comZ' ...
             );
+        CoMData.(patientID).(trialID) = trialData;
+        
+        RightFootData.(patientID).(trialID) = struct( ...
+            'x', rfPos(:, 1), ...
+            'y', rfPos(:, 2), ...
+            'z', rfPos(:, 3));
 
-        CoM_struct.(patientID).(trialID) = trialData;
     end
 end
 save("C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\MatLabCombined\Vicon_CoM.mat", ...
-    'CoM_struct')
+    'CoMData')
+save("C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\MatLabCombined\Vicon_RF.mat", ...
+    'RightFootData')
