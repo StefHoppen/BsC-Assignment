@@ -7,10 +7,9 @@ MAGNETOMETER = false;  % If magnetometer measurments should be included in the j
 
 %% CODE
 IMUData = struct();
-RightFootData = struct();
 
 parentDir = 'C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\MatLab\IMU';
-SensorIDs = ["LeftFoot", "RightFoot", "Sternum", "Pelvis"];
+SensorIDs = ["LF", "RF", "Ste", "Pel"];
 
 
 % Get list of subfolders (excluding '.' and '..')
@@ -64,40 +63,16 @@ for i = 1:length(folderList)
                 mag = mag(:, 2:4);
             end
             sensorID = char(SensorIDs(k));
-            
-            accData = struct( ...
-                'x', acc(:, 1), ...
-                'y', acc(:, 2), ...
-                'z', acc(:, 3));
-            gyrData = struct( ...
-                'x', gyr(:, 1), ...
-                'y', gyr(:, 2), ...
-                'z', gyr(:, 3));
-            
-            magData = struct( ...
-                'x', mag(:, 1), ...
-                'y', mag(:, 2), ...
-                'z', mag(:, 3));
-            
             if MAGNETOMETER == true
                 sensorData = struct( ...
-                    'Accelerometer', accData, ...
-                    'Gyroscope', gyrData, ...
-                    'Magnetometer', magData);
+                    'Accelerometer', acc, ...
+                    'Gyroscope', gyr, ...
+                    'Magnetometer', mag);
             else
                 sensorData = struct( ...
-                    'Accelerometer', accData, ...
-                    'Gyroscope', gyrData);
-            
-            % If sensorID is right foot, also save it to a different
-            % struct (needed for syncing)
-            if strcmp(sensorID, 'RightFoot')
-                RightFootData.(patientID).(trialID) = accData;
-            
+                    'Accelerometer', acc, ...
+                    'Gyroscope', gyr);
             end
-
-            end
-
 
 
             IMUData.(patientID).(trialID).(sensorID) = sensorData;
@@ -107,6 +82,4 @@ end
 %% Saving to .mat file
 save("C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\MatLabCombined\IMU_Rotated.mat", ...
     'IMUData')
-save("C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\MatLabCombined\IMU_RF.mat", ...
-    'RightFootData')
 

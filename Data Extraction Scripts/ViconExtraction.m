@@ -1,10 +1,8 @@
 clc
 close all 
 clear
-
-CoMData = struct();
-
-RightFootData = struct();
+%% Extracts the Left Foot, Right Foot and COM position of each trial
+ViconData = struct();
 
 parentDir = 'C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\MatLab\VICON';
 
@@ -36,29 +34,17 @@ for i = 1:length(folderList)
         rasiPos = rawdata.MarkerPos.RASI;
         rpsiPos = rawdata.MarkerPos.RPSI;
 
-        comPos = (1 / 1e3) * (lasiPos + lpsiPos + rasiPos + rpsiPos) / 4; % m
+        comPos = (lasiPos + lpsiPos + rasiPos + rpsiPos) / 4; % m
         
-        comX = comPos(:, 1);
-        comY = comPos(:, 2);
-        comZ = comPos(:, 3);
-
         rfPos = rawdata.MarkerPos.RHEE;
+        lfPos = rawdata.MarkerPos.LHEE;
         
-        trialData = struct( ...
-            'x', comX', ...
-            'y', comY', ...
-            'z', comZ' ...
-            );
-        CoMData.(patientID).(trialID) = trialData;
-        
-        RightFootData.(patientID).(trialID) = struct( ...
-            'x', rfPos(:, 1), ...
-            'y', rfPos(:, 2), ...
-            'z', rfPos(:, 3));
+        ViconData.(patientID).(trialID) = struct( ...
+            'LF', lfPos, ...
+            'RF', rfPos, ...
+            'COM', comPos);
 
     end
 end
-save("C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\MatLabCombined\Vicon_CoM.mat", ...
-    'CoMData')
-save("C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\MatLabCombined\Vicon_RF.mat", ...
-    'RightFootData')
+save("C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\MatLabCombined\Vicon.mat", ...
+    'ViconData')
