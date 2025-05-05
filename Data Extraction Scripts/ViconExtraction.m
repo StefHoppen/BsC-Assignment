@@ -35,10 +35,22 @@ for i = 1:length(folderList)
         rpsiPos = rawdata.MarkerPos.RPSI;
 
         comPos = (lasiPos + lpsiPos + rasiPos + rpsiPos) / 4; % m
-        
+
         rfPos = rawdata.MarkerPos.RHEE;
         lfPos = rawdata.MarkerPos.LHEE;
         
+        % Rotating coordinate frame such that the walking direction is in
+        % positive x-direction. (If you switch x, then you must also switch
+        % y)
+        comPos(:, 1) = -comPos(:, 1);
+        comPos(:, 2) = -comPos(:, 2);
+
+        rfPos(:, 1) = -rfPos(:, 1);
+        rfPos(:, 2) = -rfPos(:, 2);
+
+        lfPos(:, 1) = -lfPos(:, 1);
+        lfPos(:, 2) = -lfPos(:, 2);
+
         ViconData.(patientID).(trialID) = struct( ...
             'LF', lfPos, ...
             'RF', rfPos, ...

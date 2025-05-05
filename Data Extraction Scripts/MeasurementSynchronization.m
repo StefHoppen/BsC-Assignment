@@ -117,25 +117,6 @@ for patient = 1:length(patientList)
             viconStart = fix(Loc(1));
             viconStop = fix(Loc(end));  % Converting also to integers
 
-            
-            %{
-            % Locating local maxima 
-            [Peaks, Locs, ~, Prom] = findpeaks(viconRF);
-            % Finding 2 maxima with the higest prominence
-            
-            [~, bestLoc] = maxk(Prom, 8);
-            % Sort the peaks
-            bestLoc = sort(bestLoc);
-            % Minimum Starting Point is Timestamp 1500;
-            % Minimum Ending Point is Timestamp 4500
-            Locs = Locs(bestLoc);
-            Locs = Locs(Locs >= 1500 & Locs <= 4200);
-            
-            viconStart = Locs(1);
-            viconStop = Locs(end);
-            
-            %}
-
             % Since all signals are synced to the IMU (worked best) but
             % the signal start is given by the VICON, this piece of code is
             % a bit chaotic. But it works.
