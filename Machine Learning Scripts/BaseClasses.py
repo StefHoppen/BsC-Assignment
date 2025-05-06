@@ -1,5 +1,11 @@
+import pandas as pd
+import os
 import torch
+from torch.utils.data import Dataset
 import math
+import json
+import random
+
 
 def computeLinearArchitecture(input_size, steps, output_size):
     b = input_size
@@ -14,7 +20,6 @@ def computeLinearArchitecture(input_size, steps, output_size):
     # Adding final layer
     architecture.append((previous_size, output_size))
     return architecture
-
 
 class FNN(torch.nn.Module):
     """ Base class of a FeedForward Neural Network (FNN) """
@@ -93,6 +98,47 @@ class FNN(torch.nn.Module):
 
         self.model = torch.nn.Sequential(*layers)
 
-    def forward(self, x):
+    def forward(self, x: torch.tensor):
         """ Forward method of the model """
         return self.model(x)
+
+class StraightWalkingDataset(Dataset):
+    def __init__(self, dev):
+        """ Initialises the dataset """
+        self.directory = r'C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\Python'
+
+        # Load data
+        imuDF = pd.read_csv(os.path.join(self.directory, 'IMU.csv'))
+        comDF = pd.read_csv(os.path.join(self.directory, 'COM.csv'))
+        grfDF = pd.read_csv(os.path.join(self.directory, 'GRF.csv'))
+
+        # Column selection
+        self.imuCols = [col for col in imuDF.columns if col not in ['Time', 'Patient', 'Trial']]
+        self.comCols = [col for col in comDF.columns if col not in ['Time', 'Patient', 'Trial']]
+        self.grfCols = [col for col in grfDF.columns if col not in ['Time', 'Patient', 'Trial']]
+
+        # Convert to tensors once
+        self.IMU = torch.tensor(imuDF[self.imuCols].to_numpy(), dtype=torch.float32).to(dev)
+        self.COM = torch.tensor(comDF[self.comCols].to_numpy(), dtype=torch.float32).to(dev)
+        self.GRF = torch.tensor(grfDF[self.grfCols].to_numpy(), dtype=torch.float32).to(dev)
+
+        # Extract indices related to trials
+        self.trialIdxMap = {}
+        for idx, row in imuDF.iterrows():
+            key = (row['Patient'], row['Trial'])
+            if key not in self.trialIdxMap:
+                self.trialIdxMap[key] = []
+            self.trialIdxMap[key].append(idx)
+
+
+    def __len__(self):
+        return self.IMU.shape[0]
+
+    def __getitem__(self, idx):
+        return self.IMU[idx], self.COM[idx], self.GRF[idx]
+
+    def getTrial(self):
+        """ Returns data of random trial"""
+        randomKey = random.choice(list(self.trialIdxMap.keys()))
+        trialIndices = self.trialIdxMap[randomKey]
+        return self.IMU[trialIndices, :], self.COM[trialIndices, :], self.COM[trialIndices, :]

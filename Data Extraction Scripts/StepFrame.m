@@ -166,7 +166,7 @@ for patient = 1:length(patientList)
         
         transferredCOM= zeros(size(comPos));
         for k = 1:length(comPos)
-            transferredCOM(k, :) = ((comPos(k, :) - Origins(k,:)) * Rotations(:, :, k)) * 0.1; % Position in cm   
+            transferredCOM(k, :) = ((comPos(k, :) - Origins(k,:)) * Rotations(:, :, k))*0.1 ; % Position in cm
         end
         
         % Plotting the results over time
@@ -222,6 +222,6 @@ for patient = 1:length(patientList)
     end
 end
 jsonText = jsonencode(MachineLearningData, 'PrettyPrint', true);
-fid = fopen('C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\JSON\MachineLearningData.json', 'w');
+fid = fopen('C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\Python\MachineLearningData.json', 'w');
 fwrite(fid, jsonText, 'char');
 fclose(fid);
