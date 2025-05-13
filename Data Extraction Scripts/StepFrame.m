@@ -76,7 +76,7 @@ for patient = 1:length(patientList)
         Rotations = nan(3, 3, measurementLength);
 
         % Looping over step frames
-        combinedSteps = sort([stepsLeft; stepsRight]);
+        combinedSteps = sort(stepsLeft); % Deleted Right Footed Steps
         
         for j = 1:length(combinedSteps)
             stepIdx = combinedSteps(j);
@@ -195,8 +195,15 @@ for patient = 1:length(patientList)
         % Ideally we want JSON format, due to the tree like nature of
         % experiments.
         GRF = allData.(patientID).(trialID).GRF.Total(minIdx:maxIdx, :);
-        FreeGRF = GRF(:, 3) - bodyForce;
+        FreeGRF = GRF(:, 3) - bodyForce;  % Removing gravity
         GRF(:, 3) = FreeGRF;
+        GRF = GRF / bodyWeight; % F = ma -> F/m = a (Easier for ML algorithm)
+        rotatedGRF = zeros(size(GRF));
+        for k = 1:length(GRF)
+            rotatedGRF(k, :) = GRF(k, :) * Rotations(:, :, k);  % Rotating GRF to align to step frame
+        end
+        GRF = rotatedGRF;
+
         
         COM = transferredCOM;
         
