@@ -8,8 +8,8 @@ PLOT_ORG_SIGNAL = false;  % Plot the original signals, prior to the synchronisat
 PLOT_TOTAL_SYNC = true;  % Plot the signal after the synchronization and cut
 
 %% Variable Initialisation
-StartStopIDX = struct();
 SyncedMeasurements = struct();
+
 %% Loading Data
 folderpath = 'C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\MatLabCombined';
 
@@ -43,11 +43,6 @@ for patient = 1:length(patientList)
         viconRF = viconTrial.RF(:, 3);
         imuRF = imuTrial.RF.Accelerometer(:, 3);
         
-        IFS = IFS_ACC_RF.(patientID).(trialID)(3, :)';
-        VICON = VICON_ALL.(patientID).(trialID).RF(:, 3);
-        IMU = IMU_ALL.(patientID).(trialID).RF.Accelerometer(:,3);
-        
-
         %% Plotting Original Signal Shape
         if PLOT_ORG_SIGNAL == true
             longestMeasurement = max([length(ifsRF), length(imuRF), length(viconRF)]);
@@ -105,9 +100,8 @@ for patient = 1:length(patientList)
             viconLag = lagVals(maxIndex);
 
             %% FINDING MEASUREMENT INDEXES
-            % First we find the start and stop of the measurement, this is
-            % easiest for the vicon measurement.
-            % Plotting the Vicon Signal
+            % The start and stop of each measurement is manually selected
+            % using a plotting method.
             figure;
             plot(viconRF);
             title('Click on the peaks you want. Press Enter when done.');

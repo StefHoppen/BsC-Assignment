@@ -39,7 +39,6 @@ for i = 1:length(folderList)
 
         ForceShoeData = loadMTxDataDir(trialPath, 1);
         
-
         %% Offsetting Forces
         for forceSensorCount = 1:length(ForceShoeData)
             % Moving the original measurement to different name in struct

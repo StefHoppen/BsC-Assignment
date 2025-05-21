@@ -4,18 +4,23 @@ clear
 %% Settings
 ROTATE = true;  % If accelerations and gyroscope measurements should be rotated to the global coordinate frame
 MAGNETOMETER = false;  % If magnetometer measurments should be included in the json file
+FILTERING = true; % If signals should be filtered
+
+%% Filtering settings
+fPassAcc = 1; % Pass frequency for the low-pass filter (acceleration) (hz)
+fPassGyro = 3; % Pass frequency for the low-pass filter (gyroscope) (hz)
+fSampling = 100; %Hz
 
 %% CODE
-IMUData = struct();
-
-parentDir = 'C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\MatLab\IMU';
-SensorIDs = ["LF", "RF", "Ste", "Pel"];
-
+IMUData = struct();  % Initialising struct for IMU data
+parentDir = 'C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\MatLab\IMU'; % Directory raw files are stored
+SensorIDs = ["LF", "RF", "Ste", "Pel"];  % Sensor positions
 
 % Get list of subfolders (excluding '.' and '..')
 folderList = dir(parentDir);
 folderList = folderList([folderList.isdir] & ~ismember({folderList.name}, {'.', '..'}));
 
+% Loop over folders (Patients)
 for i = 1:length(folderList)
     folderName = folderList(i).name;
     patientID = matlab.lang.makeValidName(['P' folderName]);
@@ -24,7 +29,8 @@ for i = 1:length(folderList)
 
     % Get all .mat files in this folder
     matFiles = dir(fullfile(fullFolderPath, '*.mat'));
-
+    
+    % Loop over files (Trials)
     for j = 1:length(matFiles)
         trialID = matlab.lang.makeValidName(['T' num2str(j)]);
         matFileName = matFiles(j).name;
@@ -32,7 +38,6 @@ for i = 1:length(folderList)
 
         % Loading the .mat file
         raw_data = load(fullMatPath).rawdata;
-        test = load(fullMatPath);
 
         % Looping over each sensor
         for k = 1: length(SensorIDs)
@@ -62,7 +67,16 @@ for i = 1:length(folderList)
                 gyr = gyr(:, 2:4);
                 mag = mag(:, 2:4);
             end
-            sensorID = char(SensorIDs(k));
+
+            if FILTERING == true
+                % Looping over axis
+                for m = 1:3
+                    % Applying low pass filter on each measurement type
+                    acc(:, m) = lowpass(acc(:, m), fPassAcc, fSampling);
+                    gyr(:, m) = lowpass(gyr(:, m), fPassGyro, fSampling); 
+                end  
+            end
+            sensorID = char(SensorIDs(k)); % Converting sensorID to 'char' type
             if MAGNETOMETER == true
                 sensorData = struct( ...
                     'Accelerometer', acc, ...
@@ -74,8 +88,7 @@ for i = 1:length(folderList)
                     'Gyroscope', gyr);
             end
 
-
-            IMUData.(patientID).(trialID).(sensorID) = sensorData;
+            IMUData.(patientID).(trialID).(sensorID) = sensorData;  % Storing data in 1 struct
         end
     end
 end

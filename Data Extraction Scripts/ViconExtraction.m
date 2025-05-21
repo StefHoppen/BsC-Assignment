@@ -34,10 +34,10 @@ for i = 1:length(folderList)
         rasiPos = rawdata.MarkerPos.RASI;
         rpsiPos = rawdata.MarkerPos.RPSI;
 
-        comPos = (lasiPos + lpsiPos + rasiPos + rpsiPos) / 4; % m
+        comPos = ((lasiPos + lpsiPos + rasiPos + rpsiPos) / 4) * 1e-3; % Meter
 
-        rfPos = rawdata.MarkerPos.RHEE;
-        lfPos = rawdata.MarkerPos.LHEE;
+        rfPos = rawdata.MarkerPos.RHEE * 1e-3; % Meter
+        lfPos = rawdata.MarkerPos.LHEE * 1e-3; % Meter
         
         % Rotating coordinate frame such that the walking direction is in
         % positive x-direction. (If you switch x, then you must also switch
