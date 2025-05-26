@@ -1,4 +1,5 @@
 import torch
+import math
 
 class FeedForwardNeuralNetwork(torch.nn.Module):
     activation_options = ['ReLU', 'Tanh', 'Sigmoid']
@@ -27,6 +28,74 @@ class FeedForwardNeuralNetwork(torch.nn.Module):
     def forward(self, x: torch.tensor):
         """ Forward method of the model """
         return self.model(x)
+
+class CentralFDConv1D(torch.nn.Module):
+    """ Uses a predefined filter to compute the second derivative of a signal, using Central Finite Difference method. """
+    kernel_coefficients = {
+        2: torch.tensor([1, -2, 1]),
+        4: torch.tensor([-1/12, 4/3, -5/2, 4/3, -1/12]),
+        6: torch.tensor([1/90, -3/20, 3/2, -49/18, 3/2, -3/20, 1/90]),
+        8: torch.tensor([-1/560, 8/315, -1/5, 8/5, -205/72, 8/5,  -1/5, 8/315, -1/560])
+    }
+
+    def __init__(self, stencil_radius: int, h: float = 0.01):
+        """ Inputs:
+            1. stencil_radius: How many datapoints on one side the Central Finite Difference method uses (must be greater than 2).
+            2. h: Distance between two datapoints, in our case time.  """
+
+        super(CentralFDConv1D, self).__init__()
+        self.stencil_radius = stencil_radius
+        self.kernel_size = stencil_radius*2 + 1
+        self.kernel_weights = (self.kernel_coefficients[int(stencil_radius*2)].clone().view(1, 1, -1) / h**2).repeat(3, 1, 1)
+
+        self.Conv = torch.nn.Conv1d(in_channels=3, out_channels=3, kernel_size=self.kernel_size, bias=False, groups=3)
+        self.Conv.weight = torch.nn.Parameter(self.kernel_weights, requires_grad=False)
+
+        # Calculating the weights for padding
+        forwardMatrix, backwardMatrix = [], []
+        for k in range(1, stencil_radius+1):
+            forwardEntry, backwardEntry = [], []
+            for m in range(1, stencil_radius+1):
+                forwardEntry.append( math.pow(k, m) / math.factorial(m) )
+                backwardEntry.append( math.pow(-k, m) / math.factorial(m) )
+            forwardMatrix.append(forwardEntry)
+            backwardMatrix.append(backwardEntry)
+
+        self.forwardMatrix = torch.inverse(torch.tensor(forwardMatrix))  # For this matrix, we only need the inverse for padding
+        self.backwardMatrix = torch.tensor(backwardMatrix)
+
+    def padInputs(self, x: torch.tensor):
+        """ Pads the input on both ends using Taylor Expansion """
+        R = self.stencil_radius
+
+        # Loop over each dimension separately
+        startPadding = []
+        endPadding = []
+        for dimension in range(x.shape[1]):  # x has shape (Batch x Channels(dims) x Time steps)
+            xStart = x[:, dimension, 0]
+            xRight = x[:, dimension, 1:R+1].T # Make column vector
+            xDiffStart = (xRight - xStart) # Make column vector
+            padStartDim = xStart + self.backwardMatrix @ (self.forwardMatrix @ xDiffStart)
+            padStartDim = torch.flip(padStartDim.T, (1,))
+            startPadding.append(padStartDim)
+
+            xEnd = x[:, dimension, -1]
+            xLeft = x[:, dimension, -R-1:-1].T # Make column vector
+            xLeft = torch.flip(xLeft, (0,))
+            xDiffEnd = (xLeft - xEnd)
+            padEndDim = xEnd + self.backwardMatrix @ (self.forwardMatrix @ xDiffEnd)
+            padEndDim = padEndDim.T
+            endPadding.append(padEndDim)
+
+        startPadding = torch.stack(startPadding, dim=1)
+        endPadding = torch.stack(endPadding, dim=1)
+        xPadded = torch.cat([startPadding, x, endPadding], dim=2)
+        return xPadded
+
+    def forward(self, x: torch.tensor):
+        x = self.padInputs(x)  # Pad the inputs
+        second_derivative = self.Conv(x)
+        return second_derivative
 
 class CausalConv1D(torch.nn.Module):
     """ Custom convolution class that does not 'peek' in the future. This also includes weight normalisation """
@@ -112,4 +181,15 @@ class TemporalConvolutionNetwork(torch.nn.Module):
         x = self.Linear(x)  # Size = [Batch x Times x Output]
         x = x.permute(0, 2, 1) # Size = [Batch x Output x Times]
         return x
+
+def PINNLoss(comHat: torch.tensor, comPos: torch.tensor , comAcc: torch.tensor, grf: torch.tensor, wPhysics:float):
+    naive_loss = torch.mean((comHat - comPos)**2)
+    physics_loss = torch.mean(torch.abs(comAcc - grf))
+
+    total_loss = naive_loss + wPhysics*physics_loss
+    return total_loss
+
+def NaiveLoss(comHat: torch.tensor, comPos: torch.tensor):
+    return torch.mean((comHat - comPos)**2)
+
 
