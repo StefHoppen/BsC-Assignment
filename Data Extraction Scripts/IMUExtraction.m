@@ -2,7 +2,6 @@ clc
 close all 
 clear
 %% Settings
-ROTATE = true;  % If accelerations and gyroscope measurements should be rotated to the global coordinate frame
 MAGNETOMETER = false;  % If magnetometer measurments should be included in the json file
 FILTERING = true; % If signals should be filtered
 
@@ -44,30 +43,33 @@ for i = 1:length(folderList)
             acc = raw_data.acc{k};
             gyr = raw_data.gyr{k};
             mag = raw_data.mag{k};
+            quats = raw_data.q_ls_xda{k};
             
-            if ROTATE == true
-                % Getting quaternions
-                quats = raw_data.q_ls_xda{k};
-                % Creating quaternion conjugates
-                quats_conj = quats;
-                quats_conj(:, 2:4) = -quats(:, 2:4);
 
-                % Creating quaternions from vectors
-                acc_quat = [zeros(size(acc, 1), 1), acc];
-                gyr_quat = [zeros(size(acc, 1), 1), gyr];
-                mag_quat = [zeros(size(acc, 1), 1), mag];
 
-                % Rotating the vectors using the quaternions
-                acc = quatmultiply(quatmultiply(quats, acc_quat), quats_conj);
-                gyr = quatmultiply(quatmultiply(quats, gyr_quat), quats_conj);
-                mag = quatmultiply(quatmultiply(quats, mag_quat), quats_conj);
+            %{
+            % Getting quaternions
+            quats = raw_data.q_ls_xda{k};
+            % Creating quaternion conjugates
+            quats_conj = quats;
+            quats_conj(:, 2:4) = -quats(:, 2:4);
 
-                % Cutting of the scalar part
-                acc = acc(:, 2:4);
-                gyr = gyr(:, 2:4);
-                mag = mag(:, 2:4);
-            end
+            % Creating quaternions from vectors
+            acc_quat = [zeros(size(acc, 1), 1), acc];
+            gyr_quat = [zeros(size(acc, 1), 1), gyr];
+            mag_quat = [zeros(size(acc, 1), 1), mag];
 
+            % Rotating the vectors using the quaternions
+            acc = quatmultiply(quatmultiply(quats, acc_quat), quats_conj);
+            gyr = quatmultiply(quatmultiply(quats, gyr_quat), quats_conj);
+            mag = quatmultiply(quatmultiply(quats, mag_quat), quats_conj);
+
+            % Cutting of the scalar part
+            acc = acc(:, 2:4);
+            gyr = gyr(:, 2:4);
+            mag = mag(:, 2:4);
+            %}
+            
             if FILTERING == true
                 % Looping over axis
                 for m = 1:3
@@ -79,11 +81,13 @@ for i = 1:length(folderList)
             sensorID = char(SensorIDs(k)); % Converting sensorID to 'char' type
             if MAGNETOMETER == true
                 sensorData = struct( ...
+                    'Quaternion', quats, ...
                     'Accelerometer', acc, ...
                     'Gyroscope', gyr, ...
                     'Magnetometer', mag);
             else
                 sensorData = struct( ...
+                    'Quaternion', quats, ...
                     'Accelerometer', acc, ...
                     'Gyroscope', gyr);
             end
@@ -93,6 +97,6 @@ for i = 1:length(folderList)
     end
 end
 %% Saving to .mat file
-save("C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\MatLabCombined\IMU_Rotated.mat", ...
+save("C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\MatLabCombined\IMU.mat", ...
     'IMUData')
 
