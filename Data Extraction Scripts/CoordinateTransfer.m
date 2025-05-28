@@ -158,7 +158,7 @@ for patient = 1:length(patientList)
                 
     
                 %% === Storing Data ===
-                stepID = sprintf('Step%d', k-1);
+                stepID = sprintf('S%d', k-1);
                 MachineLearningData.(patientID).(trialID).(stepID) = struct( ...
                     'IMU', imuStep, ...
                     'COM', comStep, ...
@@ -185,7 +185,7 @@ for patient = 1:length(patientList)
 end
 
 jsonText = jsonencode(MachineLearningData, 'PrettyPrint', true);
-fid = fopen('C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\Python\PerStepData.json', 'w');
+fid = fopen('C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\Python\MachineLearningData.json', 'w');
 fwrite(fid, jsonText, 'char');
 fclose(fid);
 
