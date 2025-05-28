@@ -5,6 +5,11 @@ clear
 PLOT_STEPS = false;
 PLOT_MEASUMRENTS = false;
 
+%% Step Location:
+AT_FEET = false;  % Position the origins at either feet
+BET_FEET = true;  % Position origins between feet position
+
+
 g = 9.81;
 stepThreshold = 0.8;  % Threshold when the GRF is considered a step
 
@@ -29,101 +34,91 @@ for patient = 1:length(patientList)
     %% Looping over trials
     for trial = 1:length(trialList)
         trialID = trialList{trial};
-        %% Detecting steps
-        % Getting GRF data as a fraction of the body mass
+        %% Detecting Steps
+        % Getting GRF data as a fraction of the body exerts by gravity
         leftGRF = allData.(patientID).(trialID).GRF.LF(:, 3) / bodyForce;
         leftGRF(leftGRF > stepThreshold) = stepThreshold;
         rightGRF = allData.(patientID).(trialID).GRF.RF(:, 3) / bodyForce;
         rightGRF(rightGRF > stepThreshold) = stepThreshold;
-
-        isStepLeft = abs(leftGRF - 0.8) < 1e-6; % Tolerance for precision point errors
-        isStepRight = abs(rightGRF - 0.8) < 1e-6;
-
+        
+        % Finding points where GRF is greater than stepThreshold
+        isStepLeft = abs(leftGRF - stepThreshold) < 1e-6; % Tolerance for precision point errors
+        isStepRight = abs(rightGRF - stepThreshold) < 1e-6;
+        
+        % Using the diff function, we can determine where the signal goes
+        % from 'no step' to 'step', or vice versa. Essentially detecting
+        % steps.
         dLeft = diff([0; isStepLeft; 0]);
         dRight = diff([0; isStepRight; 0]);
+        
 
+        %% Computing Step Indexes
+        % Finding step points for left foot
         startsLeft = find(dLeft == 1);
         endsLeft = find(dLeft == -1) - 1;
         stepsLeft = round((startsLeft + endsLeft) /2);
-
+        
+        % Finding step points for right foot
         startsRight = find(dRight == 1);
         endsRight = find(dRight == -1) - 1;
         stepsRight = round((startsRight + endsRight) / 2);
         
         %% Assigining Step Frame to each timestep
-        % Extracting Step Position from VICON
+        % Loading all positions in the trial
         leftPos = allData.(patientID).(trialID).VICON.LF;  % X,Y position
         rightPos = allData.(patientID).(trialID).VICON.RF;        
         measurementLength = length(rightPos);
 
-        % Calculating walking direction
+        % Storing the x,y position of each detected step.
         leftStepPos = leftPos(stepsLeft, 1:2);
         rightStepPos = rightPos(stepsRight, 1:2);
 
-
-        leftDelta = diff(leftStepPos, 1, 1);
-        leftNorms = sqrt(sum(leftDelta.^2, 2));
-        leftVec = leftDelta ./ leftNorms;
-
-        rightDelta = diff(rightStepPos, 1, 1);
-        rightNorms = sqrt(sum(rightDelta.^2, 2));
-        rightVec = rightDelta ./ rightNorms;
-
-        % Creating Variables
-        Origins = nan(measurementLength, 3);
-        Origins(:, 3) = metaData.(patientID).LegLength* 1000; % Convert to mm
-
-        Rotations = nan(3, 3, measurementLength);
-
-        % Looping over step frames
-        combinedSteps = sort(stepsLeft); % Deleted Right Footed Steps
+        % Calculating the vector that goes from the current step, to the
+        % next step of the same foot.
+        % LEFT FOOT
+        leftDelta = diff(leftStepPos, 1, 1);  % Compute direction
+        leftNorms = sqrt(sum(leftDelta.^2, 2));  % Compute magnitude
+        leftVec = leftDelta ./ leftNorms;  % Normalise vectors
+        leftVec = [leftVec; leftVec(end, :)];  % Duplicate last entry 
+        % (To keep the length the same as the points)
         
-        for j = 1:length(combinedSteps)
-            stepIdx = combinedSteps(j);
+        % Right Foot
+        rightDelta = diff(rightStepPos, 1, 1);  % Compute direction
+        rightNorms = sqrt(sum(rightDelta.^2, 2));  % Compute magnitude
+        rightVec = rightDelta ./ rightNorms;  % Normalise vectors
+        rightVec = [rightVec; rightVec(end, :)]; % Duplicate last entry
+
+        % Sort all steps based on time
+        allStepIdx = [stepsLeft; stepsRight];  % Concatenate all steps
+        allStepPos = [leftStepPos; rightStepPos];  % Concatenate all step positions
+        allStepVec = [leftVec; rightVec];  % Concatenate all directions
+
+        [sortedTime, sortedIdx] = sort(allStepIdx);  % Sort all steps time wise
+        sortedPositions = allStepPos(sortedIdx, :);  % Sort all positions time wise
+        sortedVectors = allStepVec(sortedIdx, :);  % Store all directions time wise
+        
+       
+        Origins = nan(measurementLength, 3);  % Initialising Origin Matrix
+        Origins(:, 3) = metaData.(patientID).LegLength;  % Setting z-origin at end of legs
+
+        Rotations = nan(3, 3, measurementLength);  % Initialising Rotation Matrix
+
+        % Looping over combined steps
+        prevIndex = 1;
+        for j = 1:length(sortedPositions)-1
+            currentPos = sortedPositions(j, :);
+            nextPos = sortedPositions(j+1, :);
             
-            % Calculting Origin and Rotation matrix
-            if ismember(stepIdx, stepsLeft)
-                % If the step originates from the left foot
-                leftIdx = find(stepsLeft == stepIdx);
-                Org = leftStepPos(leftIdx, :);
-                if leftIdx == length(stepsLeft)
-                    % Final step in sequence
-                    R = nan(3, 3);
-                else
-                    walkingDir = [leftVec(leftIdx, :) 0];
-                    hipDir = [walkingDir(2) -walkingDir(1) 0];
-                    upDir = [0 0 1];
-                    R = [walkingDir(:), hipDir(:), upDir(:)];
-                end
 
-            else
-                % If the step originates from the right foot
-                rightIdx = find(stepsRight == stepIdx);
-                Org = rightStepPos(rightIdx, :);
+            currentIndex = sortedTime(j);
+            Origins(prevIndex:currentIndex, 1:2) = repmat(mean([currentPos; nextPos]), currentIndex - prevIndex + 1, 1);  % Set the x-y 
+            % of the origin.
+            
+            walkingDir = [sortedVectors(j, :) 0];
+            hipDir = [walkingDir(1) -walkingDir(2) 0];
+            verDir = [0 0 1];
 
-                if rightIdx == length(stepsRight)
-                    R = nan(3, 3);
-                else
-                    walkingDir = [rightVec(rightIdx, :) 0];
-                    hipDir = [walkingDir(2) -walkingDir(1) 0];
-                    upDir = [0 0 1];
-                    R = [walkingDir(:), hipDir(:), upDir(:)];    
-                end
-            end
-           
-            % Assigning each Origin and Rotation matrix to timesteps
-            if j == length(combinedSteps)
-                % Final step
-                N = measurementLength-stepIdx;
-            else
-                N = combinedSteps(j+1) - stepIdx;
-                Org = repmat(Org, N+1, 1);
-                R = repmat(R, 1, 1, N+1);
-
-                Origins(stepIdx:stepIdx+N, 1:2) = Org;
-                Rotations(:, :, stepIdx:stepIdx+N) = R;
-
-            end
+            Rotations(:, :, prevIndex:currentIndex) = repmat([walkingDir; hipDir; verDir], 1, 1, currentIndex-prevIndex + 1);   
         end
         
         %% Cutting Measurements
@@ -166,7 +161,7 @@ for patient = 1:length(patientList)
         
         transferredCOM= zeros(size(comPos));
         for k = 1:length(comPos)
-            transferredCOM(k, :) = ((comPos(k, :) - Origins(k,:)) * Rotations(:, :, k))*0.1 ; % Position in cm
+            transferredCOM(k, :) = ((comPos(k, :) - Origins(k,:)) * Rotations(:, :, k)) * 1e-3; % Position in m
         end
         
         % Plotting the results over time
