@@ -154,7 +154,12 @@ for patient = 1:length(patientList)
                 
                 %% -- Extracting GRF of step --
                 % Should rotate this, TO DO
-                grfStep = grfTrial(startIdx:stopIdx, :);
+                grfStep = grfTrial(startIdx:stopIdx, :) / bodyWeight;  % Making it directly proportional to accelerations
+                %grfStep(:, 3) = grfStep(:, 3) - g;  % Remove gravity component
+                %grfStep = rotateGRF( ...
+                %    grfStep, ...
+                %    combinedRotations(:, :, k-1));
+
                 
     
                 %% === Storing Data ===
@@ -183,6 +188,11 @@ for patient = 1:length(patientList)
         end
     end
 end
+save("C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\MatLabCombined\MachineLearningData.mat", ...
+    'MachineLearningData')
+
+
+
 
 jsonText = jsonencode(MachineLearningData, 'PrettyPrint', true);
 fid = fopen('C:\Users\stefh\Documents\ME Year 3\BSC Assignment\GitHub Repository\Data Files\StraightWalking\Python\MachineLearningData.json', 'w');
@@ -239,6 +249,19 @@ function transferredPosition = coordinateTransfer(orgPos, Origin, Rotation)
     end
 end
 
+
+function transferredGRF = rotateGRF(orgGRF, Rotation)
+    transferredGRF = zeros(size(orgGRF));
+    nTimesteps = length(orgGRF);
+    Rotation = repmat(Rotation, 1, 1, nTimesteps);
+
+    for t = 1:nTimesteps
+        transferredGRF(t, :) = orgGRF(t, :) * Rotation(:, :, t)';  
+    end
+
+
+
+end
 
 function calibratedSignal = calibrateIMUSignal(imuSignal, quaternion)
     signalLength = length(imuSignal);
