@@ -1,6 +1,43 @@
+import numpy as np
 import torch
 import math
 
+def polyFit(y: torch.Tensor, poly_deg: int, f_sample: int):
+    """
+    Fits an N-th degree polynomial to each timeseries axis (x, y, z), while respecting gradient flow.
+
+    # y_1 = a_0 + a_1*x_1 + a_2*x_1^2
+    # Y = [X] A
+    #   Y = Column vector of data you want to fit to
+    #   X = Matrix with x coefficients ([1 x x^2 ... x^poly_deg]
+    #   A = Column vectors of a coefficients ([a_0 a_1 a_2 ... a_poly_deg])
+
+        Inputs:
+            y: Tensor of shape (Batch x Axis x Time steps)
+            poly_deg: Degree of the polynomial that is fitted
+            f_sample: Sampling frequency in Hz of the input signal.
+        Returns:
+            y_fitted: Tensor same shape as
+
+    """
+    nBatch, nAxis, nPoints = y.shape
+    timeVec = torch.arange(nPoints) * (1/f_sample)
+
+    # Build the Vandermonde matrix
+    X = torch.stack([timeVec ** i for i in range(poly_deg + 1)], dim=1)
+
+    allCoefficients = torch.zeros((nBatch, nAxis, poly_deg+1))
+    yFitted = torch.zeros((nBatch, nAxis, nPoints))
+    for iBatch in range(nBatch): # Loop over each batch
+        for iAxis in range(nAxis):  # Loop over x, y, z
+            Y = y[iBatch, iAxis, :]
+            A, *_ = torch.linalg.lstsq(X, Y)  # This is weird notation, but check it.
+            allCoefficients[iBatch, iAxis, :] = A
+            yFitted[iBatch, iAxis, :] = torch.matmul(X, A)
+    return yFitted
+
+
+""" UNUSED CLASSES """
 class FeedForwardNeuralNetwork(torch.nn.Module):
     activation_options = ['ReLU', 'Tanh', 'Sigmoid']
     def __init__(self, architecture: list, act_func: str, p_dropout: float):
@@ -97,6 +134,113 @@ class CentralFDConv1D(torch.nn.Module):
         second_derivative = self.Conv(x)
         return second_derivative
 
+class GaussianConv1D(torch.nn.Module):
+    """ Uses a Gaussian Kernel to smooth out a 1D signal. """
+    def __init__(self, window_size: int, std_dev:float):
+        super(GaussianConv1D, self).__init__()
+        self.window_size = window_size
+        self.std_dev = std_dev
+        self.const_term = 1 / (std_dev*math.sqrt(2*math.pi))  # Constant term of the normal distribution
+        kernel = self.constructKernel()
+        self.register_buffer('kernel', kernel.view(1, 1, -1))  # shape: (out_channels, in_channels, kernel_size)
+        #self.kernel = torch.nn.Parameter(kernel.view(1, 1, -1), requires_grad=True)  # Learnable!
+
+    def forward(self, x:torch.tensor):
+        # Looping over axis
+        allAcc = []
+        for axis in range(x.shape[1]):
+            axisPos = x[:, axis:axis+1, :]
+            axisAcc = torch.nn.functional.conv1d(axisPos, self.kernel)
+            allAcc.append(axisAcc)
+        allAcc = torch.cat(allAcc, dim=1)
+        return allAcc
+
+    def sampleDist(self, x: float):
+        power = - x**2 / (2*self.std_dev**2)
+        y = self.const_term * math.exp(power)
+        return y
+
+    def constructKernel(self):
+        R = self.window_size // 2
+        xRange = list(range(-R, R+1))
+        if self.window_size % 2 == 0:  # If window size is even
+            raise ValueError('Window size must be an uneven integer')
+
+        kernelCoefs = []
+        for x in xRange:
+            yNormal = self.sampleDist(x)
+            kernelCoefs.append(yNormal)
+        kernelCoefs = torch.tensor(kernelCoefs)  # Create tensor
+        kernelCoefs /= torch.sum(kernelCoefs)  # Normalise
+        return kernelCoefs
+
+
+""" PINN EXTENSION """
+class RateLimiter(torch.nn.Module):
+    """ Reduces the sampling rate of an output signal through taking an average """
+    def __init__(self, n_points:int):
+        super(RateLimiter, self).__init__()
+        self.n_points = n_points
+        coefficient = torch.tensor(1/n_points)
+        kernel = torch.stack([coefficient]*n_points)
+        self.register_buffer('kernel', kernel.view(1, 1, -1))
+
+    def forward(self, x):
+        # Looping over axis
+        newSignalList = []
+        for axis in range(x.shape[1]):
+            oldSignal = x[:, axis:axis + 1, :]
+            newSignal = torch.nn.functional.conv1d(oldSignal, self.kernel, stride=self.n_points)
+            newSignalList.append(newSignal)
+        newSignalTensor = torch.cat(newSignalList, dim=1)
+        return newSignalTensor
+
+class SimpleFDConv1D(torch.nn.Module):
+    """ Simple Central Finite Difference calculator that computes the 2nd order derivative """
+    kernel_coefficients = {
+        1: torch.tensor([1, -2, 1], dtype=torch.float32),
+        2: torch.tensor([-1 / 12, 4 / 3, -5 / 2, 4 / 3, -1 / 12], dtype=torch.float32),
+        3: torch.tensor([1 / 90, -3 / 20, 3 / 2, -49 / 18, 3 / 2, -3 / 20, 1 / 90], dtype=torch.float32),
+        4: torch.tensor([-1 / 560, 8 / 315, -1 / 5, 8 / 5, -205 / 72, 8 / 5, -1 / 5, 8 / 315, -1 / 560], dtype=torch.float32)
+    }
+
+    def __init__(self, stencil_radius: int, h:float):
+        super(SimpleFDConv1D, self).__init__()
+        self.R = stencil_radius
+        self.h = h
+        kernel = self.kernel_coefficients[stencil_radius] / (h**2)
+        # The following line tells PyTorch to not train these parameters, but do save them when saving the model
+        self.register_buffer('kernel', kernel.view(1, 1, -1))  # shape: (out_channels, in_channels, kernel_size)
+        #self.kernel = torch.nn.Parameter(kernel.view(1, 1, -1), requires_grad=True)  # Now learnable!
+
+
+    def forward(self, x:torch.tensor):
+        # Looping over axis
+        allAcc = []
+        for axis in range(x.shape[1]):
+            axisPos = x[:, axis:axis+1, :]
+            axisAcc = torch.nn.functional.conv1d(axisPos, self.kernel)
+            allAcc.append(axisAcc)
+        allAcc = torch.cat(allAcc, dim=1)
+        return allAcc
+
+class PINNExtension(torch.nn.Module):
+    """ This class combines the SimpleFDConv1D and GaussianConv1D """
+    def __init__(self,
+                 fd_stencil_radius: int, fd_h: float,
+                 gauss_window_size: int, gauss_std: float):
+        super(PINNExtension, self).__init__()
+        self.differentiator = SimpleFDConv1D(stencil_radius=fd_stencil_radius,
+                                             h=fd_h)
+        self.smoother = GaussianConv1D(window_size=gauss_window_size,
+                                       std_dev=gauss_std)
+
+    def forward(self, x: torch.tensor):
+        xDiff = self.differentiator(x)
+        xSmooth = self.smoother(xDiff)
+        return xSmooth
+
+"""" STANDARD TCN """
 class CausalConv1D(torch.nn.Module):
     """ Custom convolution class that does not 'peek' in the future. This also includes weight normalisation """
     def __init__(self, in_channels, out_channels, kernel_size, dilation):
@@ -174,7 +318,6 @@ class TemporalConvolutionNetwork(torch.nn.Module):
         self.resBlocks = torch.nn.Sequential(*layerBlocks)
         self.Linear = torch.nn.Linear(in_features=self.channels[-1], out_features=outputs)
 
-
     def forward(self, x: torch.tensor):
         x = self.resBlocks(x) # Size = [Batch x Channels x Times]
         x = x.permute(0, 2, 1) # Size = [Batch x Times x Channels]
@@ -182,14 +325,7 @@ class TemporalConvolutionNetwork(torch.nn.Module):
         x = x.permute(0, 2, 1) # Size = [Batch x Output x Times]
         return x
 
-def PINNLoss(comHat: torch.tensor, comPos: torch.tensor , comAcc: torch.tensor, grf: torch.tensor, wPhysics:float):
-    naive_loss = torch.mean((comHat - comPos)**2)
-    physics_loss = torch.mean(torch.abs(comAcc - grf))
-
-    total_loss = naive_loss + wPhysics*physics_loss
-    return total_loss
-
-def NaiveLoss(comHat: torch.tensor, comPos: torch.tensor):
-    return torch.mean((comHat - comPos)**2)
-
-
+test = RateLimiter(5)
+x = torch.rand(1, 3, 100)
+y = test(x)
+print('hoi')
