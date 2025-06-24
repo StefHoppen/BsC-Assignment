@@ -324,8 +324,3 @@ class TemporalConvolutionNetwork(torch.nn.Module):
         x = self.Linear(x)  # Size = [Batch x Times x Output]
         x = x.permute(0, 2, 1) # Size = [Batch x Output x Times]
         return x
-
-test = RateLimiter(5)
-x = torch.rand(1, 3, 100)
-y = test(x)
-print('hoi')
